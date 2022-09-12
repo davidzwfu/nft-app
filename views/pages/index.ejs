@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <%- include ("../partials/header.ejs") %>
+</head>
+
+<body>
+
+  <!-- <%- include ("../partials/nav.ejs") %> -->
+
+<div class="jumbotron text-center">
+  <div class="container">
+    <a href="/" class="lang-logo">
+      <img src="/lang-logo.png">
+    </a>
+    <h1>NFT App</h1>
+    <p></p>
+    <!-- <p>This is a sample Node application deployed to Heroku. It's a reasonably simple app - but a good foundation for understanding how to get the most out of the Heroku platform.</p> -->
+    <div class="row">
+        <div class="col-lg-12">
+            <div class="input-group">
+                <span class="input-group-addon" id="basic-addon1">@</span>
+                <input type="text" class="form-control" placeholder="URL" id="url" value="https://ipfs.io/ipfs/QmXLmX3SpypPVfnTfgdPp4MbkRixhWV57G5s1C2QNtJ96Q">
+            </div>
+        </div>
+        <!-- <div class="col-lg-2">
+            <div class="input-group">
+                <span class="input-group-addon" id="basic-addon1">#</span>
+                <input type="text" class="form-control" placeholder="Start" id="start">
+            </div>
+        </div>
+        <div class="col-lg-2">
+            <div class="input-group">
+                <span class="input-group-addon" id="basic-addon1">#</span>
+                <input type="text" class="form-control" placeholder="End" id="end">
+            </div>
+        </div> -->
+    </div>
+    <div class="row">
+        <div class="col-lg-12">
+            <div class="input-group">
+                <span class="input-group-addon" id="basic-addon1">@</span>
+                <input type="text" class="form-control" placeholder="Smart Contract" id="opensea" value="https://opensea.io/assets/0xa08126f5e1ed91a635987071e6ff5eb2aeb67c48">
+            </div>
+        </div>
+        <!-- <div class="col-lg-2">
+            <div class="input-group">
+                <span class="input-group-addon" id="basic-addon1">ms</span>
+                <input type="text" class="form-control" placeholder="Min" id="minDelay" value="20">
+            </div>
+        </div>
+        <div class="col-lg-2">
+            <div class="input-group">
+                <span class="input-group-addon" id="basic-addon1">ms</span>
+                <input type="text" class="form-control" placeholder="Max" id="maxDelay" value="50">
+            </div>
+        </div> -->
+    </div>
+    <div class="row">
+        <div class="col-lg-2">
+            <div class="input-group">
+                <span class="input-group-addon" id="basic-addon1">#</span>
+                <input type="text" class="form-control" placeholder="Start" id="start">
+            </div>
+        </div>
+        <div class="col-lg-2">
+            <div class="input-group">
+                <span class="input-group-addon" id="basic-addon1">#</span>
+                <input type="text" class="form-control" placeholder="End" id="end">
+            </div>
+        </div>
+        <div class="col-lg-2">
+            <div class="input-group">
+                <span class="input-group-addon" id="basic-addon1">ms</span>
+                <input type="text" class="form-control" placeholder="Min" id="minDelay" value="33">
+            </div>
+        </div>
+        <div class="col-lg-2">
+            <div class="input-group">
+                <span class="input-group-addon" id="basic-addon1">ms</span>
+                <input type="text" class="form-control" placeholder="Max" id="maxDelay" value="150">
+            </div>
+        </div>
+        <div class="col-lg-2">
+            <div class="input-group">
+                <span class="input-group-addon" id="basic-addon1">c</span>
+                <input type="text" class="form-control" placeholder="Suffix" id="suffix">
+            </div>
+        </div>
+        <div class="col-lg-2">
+            <div class="input-group">
+                <span class="input-group-addon" id="basic-addon1">c</span>
+                <input type="text" class="form-control" placeholder="Offset" id="offset">
+            </div>
+        </div>
+    </div>
+    <!-- <a type="button" class="btn btn-lg btn-default" href="https://devcenter.heroku.com/articles/getting-started-with-nodejs"><span class="glyphicon glyphicon-flash"></span> Getting Started on Heroku with Node.js</a> -->
+    <div class="container__buttons">
+        <a type="button" id="get" class="btn btn-lg btn-primary"><span class="glyphicon glyphicon-download"></span> Get</a>
+        <a type="button" id="listen" class="btn btn-lg btn-primary"><span class="glyphicon glyphicon-download"></span> Listen</a>
+    </div>
+  </div>
+</div>
+
+<div class="container" id="results"></div>
+
+<div class="overlay-backdrop">
+    <div class="spinner-border" role="status"></div>
+    <p class="overlay-backdrop__progress" id="listening" style="display:none"><b>Listening...</b></span></p>
+    <p class="overlay-backdrop__progress"><span id="progressCurrent"></span> out of <span id="progressTotal"></span></p>
+    <p class="overlay-backdrop__threads">Threads: <span id="processed">0</span> / <span id="threads">0</span></p>
+    <!-- <p class="overlay-backdrop__processed" style="display:none">Done: <span id="processed">0</span></p> -->
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+    var socket;
+    var globalItems = [];
+    var total = 0;
+    var progress = 0;
+    var url = '';
+    var opensea = '';
+    var threads = 0;
+    var processed = 0;
+    var offset = '';
+
+    function listenSocket() {
+        socket = io(window.location.origin + "?data=listen");
+        $('#listening').show();
+
+        socket.on('work', (args) => {
+            progress = 0;
+            $('#threads').html(args.threads);
+            $('#progressCurrent').html(progress);
+            $('#progressTotal').html(+args.end - +args.start);
+            get(args);
+        });
+    }
+
+    function finalize() {
+        var traitTable = {};
+        var typeTable = {};
+        for (var item of globalItems) {
+            var attributes = {};
+            var itemAttributes = item['attributes'] || item['traits'];
+            for (var attribute of itemAttributes || []) {
+                var type = String(attribute.trait_type);
+                var value = String(attribute.value);
+                if (type in traitTable) {
+                    if (value in traitTable[type])
+                        traitTable[type][value] += 1;
+                    else
+                        traitTable[type][value] = 1;
+                }
+                else {
+                    traitTable[type] = {};
+                    traitTable[type][value] = 1;
+                }
+                
+                if (type in typeTable)
+                    typeTable[type] += 1;
+                else
+                    typeTable[type] = 1;
+
+                attributes[type] = value;
+            }
+            item.attributes = attributes;
+        }
+
+        for (var item of globalItems) {
+            var rarity = 0;
+            for (var prop in item.attributes) {
+                var score = 1 / (traitTable[prop][item.attributes[prop]] / total);
+                rarity += score;
+            }
+            item.rarity = rarity;
+        }
+        globalItems.sort((a,b) => {
+            return b.rarity - a.rarity;
+        });
+        var response = "";
+        response += "<h2>Ranking</h2>"
+        var types = "";
+        for (var type in typeTable) {
+            types += `<th>${type}</th>`;
+        }
+        response += `<table id="ranking"><thead><th>#</th><th>COLLECTION</th><th>OPENSEA</th><th>SCORE</th>${types}</thead>`;
+        response += `<thead><th></th><th></th><th></th><th></th>`;
+        var rarityResponse = '';
+        rarityResponse += "<h2>Rarity</h2>"
+        rarityResponse += `<table><thead><th>TYPE</th><th>TRAIT</th><th>RARITY (%)</th></thead><tbody>`;
+        for (var type in traitTable) {
+            var sorted = [...Object.keys(traitTable[type])].sort((a,b) => { return +traitTable[type][a] - +traitTable[type][b]});
+            response += '<th><select><option></option>';
+            for (var trait of sorted) {
+                var rarity = traitTable[type][trait] / total * 100;
+                response += `<option>${trait} (${rarity.toFixed(2)}%)</option>`;
+                rarityResponse += `
+                    <tr>
+                        <td>${type}</td>
+                        <td>${trait}</td>
+                        <td>${rarity.toFixed(2)}%</td>
+                    </tr>
+                    `;
+            }
+            response += '</select></th>';
+        }
+        rarityResponse += '</tbody></table>';
+        response += '</thead><tbody>';
+        console.log(offset);
+        globalItems.forEach((el, i) => {
+            var responseTypes = "";
+            for (var type in typeTable) {
+                if (el.attributes[type] == undefined)
+                    responseTypes += `<td>-</td>`;
+                else
+                    responseTypes += `<td>${el.attributes[type]} (${(traitTable[type][el.attributes[type]] / total * 100).toFixed(2)}%)</td>`;
+            }
+            response += `
+            <tr>
+                <td>${i+1}</td>
+                <td><a href='${url}/${el.id}' target="_blank" rel="noopener noreferrer">${el.id}</a></td>
+                <td><a href='${opensea}/${+el.id + +offset}' target="_blank" rel="noopener noreferrer">${+el.id + +offset}</a></td>
+                <td>${el.rarity.toFixed(2)}</td>
+                ${responseTypes}
+            </tr>
+            `;
+        });
+        response += "</tbody></table>";
+        response += rarityResponse;
+        // response += "<h2>Rarity</h2>"
+        // response += `<table><thead><th>TYPE</th><th>TRAIT</th><th>RARITY (%)</th></thead><tbody>`;
+        // for (var type in traitTable) {
+        //     var sorted = [...Object.keys(traitTable[type])].sort((a,b) => { return +traitTable[type][a] - +traitTable[type][b]});
+        //     for (var trait of sorted) {
+        //         var rarity = traitTable[type][trait] / total * 100;
+        //         response += `
+        //         <tr>
+        //             <td>${type}</td>
+        //             <td>${trait}</td>
+        //             <td>${rarity.toFixed(2)}%</td>
+        //         </tr>
+        //         `;
+        //     }
+        // }
+
+        $('#results').html(response);
+        // let a = document.createElement("a");
+        // a.style = "display: none";
+        // let url = `/get?file=${arg.items}`;
+        // a.href = url;
+        // a.click();
+        $('.overlay-backdrop').removeClass('open');
+    }
+
+    function openSocket() {
+        socket = io();
+
+        socket.on('progress', (t) => {
+            threads = t;
+            $('#threads').html(threads);
+            $('#progressCurrent').html(++progress);
+        });
+
+        socket.on('work', (args) => {
+            $('#threads').html(args.threads);
+            get(args);
+        });
+
+        socket.on('results', (arg) => {
+            globalItems = globalItems.concat(arg.items);
+            processed++;
+            $('#processed').html(processed);
+            // if (globalItems.length >= total) {
+            if (processed >= threads) {
+                console.log(globalItems);
+                finalize();
+            }
+        });
+    }
+
+    function get(args) {
+        const url = args.url;
+        const start = +args.start;
+        const end = +args.end;
+        const minDelay = +args.minDelay;
+        const maxDelay = +args.maxDelay;
+        const suffix = args.suffix;
+        var i = start;
+        var items = [];
+        const ids = [];
+        while (i < end) {
+            ids.push(i++);
+        }
+        var index = 0;
+        var delay = 0;
+        function getJson(id) {
+            delay += Math.floor(Math.random() * (maxDelay - minDelay + 1)) + minDelay;
+            return new Promise(resolve => setTimeout(() => {
+                resolve(
+                    fetch(`${url}/${id}${suffix}`)
+                        .then(res => res.json())
+                        .then((json) => {
+                            index++;
+                            console.log('Processing:', id);
+                            json['id'] = id;
+                            items.push(json);
+                            $('#progressCurrent').html(++progress);
+                            if (args.main != socket.id)
+                                socket.emit('progress', args.main);
+                        }))}, delay));
+        }
+        const promises = ids.map(id => getJson(id));
+        console.log(promises.length, 'promises...');
+        var response = "";
+        Promise.allSettled(promises)
+            .then(r => {
+                console.log("allSettled:", r.length);
+                for (var settle of r) {
+                    if (settle.status == 'rejected')
+                        console.log(settle.reason);
+                }
+                console.log(`Succesfully parsed ${index} items.`);
+                if (args.main == socket.id)
+                    globalItems = globalItems.concat(items);
+                else
+                    socket.emit('results', { main: args.main, items: items });
+            });
+    };
+
+    function reset() {
+        globalItems = [];
+        progress = 0;
+        processed = 0;
+        $('#processed').html(processed);
+        $('#progressCurrent').html(progress);
+    }
+
+    $(document).ready(function() {
+        $('#get').click(function() {
+            url = $('#url').val();
+            opensea = $('#opensea').val();
+            offset = $('#offset').val();
+            let start = $('#start').val();
+            let end = $('#end').val();
+            let minDelay = $('#minDelay').val();
+            let maxDelay = $('#maxDelay').val();
+            let suffix = $('#suffix').val();
+            if (url == '' || start == '' || end == '' || minDelay == '' || maxDelay == '') {
+                return;
+            }
+            $('#results').html('');
+            $('.overlay-backdrop').addClass('open');
+            $('#progressCurrent').html(0);
+            total = +end - +start + 1;
+            //var half = Math.ceil(total / 2);
+            $('#progressTotal').html(total);
+            //console.log("half:",half);
+            reset();
+            $('#listening').hide();
+            if (!socket)
+                openSocket();
+            //let args = { url: url, start: start, end: end, opensea: opensea, minDelay: minDelay, maxDelay: maxDelay };
+            //get({ url: url, start: start, end: +start+half, minDelay: minDelay, maxDelay: maxDelay, suffix: suffix });
+            //socket.emit('get', { url: url, start: +start+half+1, end: end, minDelay: minDelay, maxDelay: maxDelay, suffix: suffix });
+            socket.emit('get', { url: url, start: start, end: end, minDelay: minDelay, maxDelay: maxDelay, suffix: suffix });
+        });
+
+        $('#listen').click(function() {
+            $('.overlay-backdrop').addClass('open');
+            listenSocket();
+        });
+
+        $(document).on('change', 'select', function() {
+            var value = $(this).val();
+            var table = $('#ranking tbody');
+            if (value == '')
+                table.find('tr').show();
+            else {
+                table.find('tr').hide();
+                table.find(`tr:contains('${value}')`).show();
+            }
+        });
+    });
+</script>
+
+</body>
+
+</html>
+
